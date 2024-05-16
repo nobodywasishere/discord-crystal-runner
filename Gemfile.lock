@@ -34,6 +34,7 @@ GEM
       prism (>= 0.23.0, < 0.28)
       sorbet-runtime (>= 0.5.10782)
     sorbet-runtime (0.5.11380)
+    tempfile (0.2.1)
     websocket (1.2.10)
     websocket-client-simple (0.8.0)
       event_emitter
@@ -47,6 +48,7 @@ DEPENDENCIES
   discordrb
   json
   ruby-lsp
+  tempfile
 
 BUNDLED WITH
    2.5.9
