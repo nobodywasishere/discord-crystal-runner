@@ -8,38 +8,23 @@ DISCORD_BOT_TOKEN = ENV["BOT_TOKEN"]
 PLAYGROUND_URL = "https://play.crystal-lang.org/run_requests"
 
 def run_crystal_code(code)
-  Tempfile.create(["code", ".cr"]) do |file|
-    file.write(code)
-    file.flush
+  uri = URI(PLAYGROUND_URL)
+  request = Net::HTTP::Post.new(uri, "Content-Type" => "application/json")
+  request.body = {
+    run_request: {
+      language: "crystal",
+      version: "1.12.1",
+      code: code,
+    },
+  }.to_json
 
-    # Construct the command to run the Crystal code
-    command = if RUBY_PLATFORM.include?("linux")
-        [
-          "firejail", "--noprofile", "--restrict-namespaces", "--rlimit-as=3g",
-          "--timeout=00:15:00", "--read-only=#{file.path}",
-          "crystal", "run", file.path,
-        ]
-      else
-        ["crystal", "run", file.path]
-      end
-
-    # Set the NO_COLOR environment variable to disable ANSI colors
-    env = { "NO_COLOR" => "1" }
-
-    # Execute the command and capture the output
-    stdout, stderr = "", ""
-    IO.popen(env, command, err: [:child, :out]) do |io|
-      stdout = io.read
-    end
-
-    # Check the exit status
-    if $?.success?
-      stdout
-    else
-      stderr = stdout
-      stderr
-    end
+  response = Net::HTTP.start(uri.hostname, uri.port, use_ssl: uri.scheme == "https") do |http|
+    http.request(request)
   end
+
+  json = JSON.parse(response.body)
+  code_response = json["run_request"]["run"]
+  code_response["stderr"].empty? ? code_response["stdout"] : code_response["stderr"]
 end
 
 def parse_code_lucid(code)
