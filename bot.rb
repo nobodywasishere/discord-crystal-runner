@@ -14,7 +14,11 @@ def run_crystal_code(code)
 
     # Construct the command to run the Crystal code
     command = if RUBY_PLATFORM.include?("linux")
-        ["firejail", "crystal", "run", file.path]
+        [
+          "firejail", "--noprofile", "--restrict-namespaces", "--rlimit-as=3g",
+          "--timeout=00:15:00", "--read-only=#{file.path}",
+          "crystal", "run", file.path,
+        ]
       else
         ["crystal", "run", file.path]
       end
@@ -69,7 +73,7 @@ def parse_code_lucid(code)
 
       command = if RUBY_PLATFORM.include?("linux")
           [
-            "firejail", "--no-profile", "--restrict-namespaces", "--rlimit-as=3g",
+            "firejail", "--noprofile", "--restrict-namespaces", "--rlimit-as=3g",
             "--timeout=00:15:00", "--read-only=#{dir}",
             "crystal", "run", file.path,
           ]
