@@ -2,86 +2,69 @@ require "json"
 require "net/http"
 require "discordrb"
 require "tmpdir"
-require "tempfile"
 
 DISCORD_BOT_TOKEN = ENV["BOT_TOKEN"]
-PLAYGROUND_URL = "https://play.crystal-lang.org/run_requests"
 
 def run_crystal_code(code)
-  uri = URI(PLAYGROUND_URL)
-  request = Net::HTTP::Post.new(uri, "Content-Type" => "application/json")
-  request.body = {
-    run_request: {
-      language: "crystal",
-      version: "1.12.1",
-      code: code,
-    },
-  }.to_json
+  Dir.mktmpdir do |dir|
+    code_file_path = File.join(dir, "code.cr")
+    File.write(code_file_path, code)
 
-  response = Net::HTTP.start(uri.hostname, uri.port, use_ssl: uri.scheme == "https") do |http|
-    http.request(request)
+    command = [
+      "docker", "run", "--quiet", "--platform", "linux/amd64", "--rm",
+      "-v", "#{code_file_path}:/code.cr",
+      "crystallang/crystal", "crystal", "run", "/code.cr",
+    ]
+
+    stdout, stderr = "", ""
+    IO.popen(command, err: [:child, :out]) do |io|
+      stdout = io.read
+    end
+
+    if $?.success?
+      stdout
+    else
+      stderr = stdout
+      stderr
+    end
   end
-
-  json = JSON.parse(response.body)
-  code_response = json["run_request"]["run"]
-  code_response["stderr"].empty? ? code_response["stdout"] : code_response["stderr"]
 end
 
 def parse_code_lucid(code)
   Dir.mktmpdir do |dir|
-    # Clone the Lucid repository into the temporary directory
     `git clone https://github.com/lucid-crystal/compiler/ #{dir}/lucid`
 
-    # Create a temporary file to store the Crystal code in the same directory
-    Tempfile.create(["code", ".cr"], dir) do |file|
-      heredoc_key = (0...32).map { (65 + rand(26)).chr }.join
+    user_code_file_path = File.join(dir, "user_code.cr")
+    File.write(user_code_file_path, code)
 
-      file.write <<~CRYSTAL
-                   require "./lucid/src/compiler"
+    main_file_path = File.join(dir, "main.cr")
+    File.write(main_file_path, <<~CRYSTAL)
+      require "./lucid/src/compiler"
 
-                   code = <<-#{heredoc_key}
-                 CRYSTAL
+      code = File.read("./user_code.cr")
 
-      file.write(code)
-
-      file.write <<~CRYSTAL
-
-                   #{heredoc_key}
-
-                   tokens = Lucid::Compiler::Lexer.run code
-                   Lucid::Compiler::Parser.parse(tokens).each do |node|
-                     pp node
-                   end
-                 CRYSTAL
-
-      file.flush
-
-      command = if RUBY_PLATFORM.include?("linux")
-          [
-            "firejail", "--noprofile", "--restrict-namespaces", "--rlimit-as=3g",
-            "--timeout=00:15:00", "--read-only=#{dir}",
-            "crystal", "run", file.path,
-          ]
-        else
-          ["crystal", "run", file.path]
-        end
-
-      # Set the NO_COLOR environment variable to disable ANSI colors
-      env = { "NO_COLOR" => "1" }
-
-      # Execute the command and capture the output
-      stdout, stderr = "", ""
-      IO.popen(env, command, err: [:child, :out]) do |io|
-        stdout = io.read
+      tokens = Lucid::Compiler::Lexer.run code
+      Lucid::Compiler::Parser.parse(tokens).each do |node|
+        pp node
       end
+    CRYSTAL
 
-      # Check the exit status
-      if $?.success?
-        stdout
-      else
-        stderr = stdout
-        stderr
-      end
+    command = [
+      "docker", "run", "--quiet", "--platform", "linux/amd64", "--rm",
+      "-v", "#{dir}:/workspace", "-w", "/workspace",
+      "crystallang/crystal", "crystal", "run", "/workspace/main.cr",
+    ]
+
+    stdout, stderr = "", ""
+    IO.popen(command, err: [:child, :out]) do |io|
+      stdout = io.read
+    end
+
+    if $?.success?
+      stdout
+    else
+      stderr = stdout
+      stderr
     end
   end
 end
