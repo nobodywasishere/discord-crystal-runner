@@ -10,8 +10,18 @@ def run_crystal_code(code)
     code_file_path = File.join(dir, "code.cr")
     File.write(code_file_path, code)
 
+    version_command = [
+      "docker", "run", "--quiet", "--platform", "linux/amd64", "--rm", "-e", "NO_COLOR=1",
+      "crystallang/crystal", "crystal", "--version",
+    ]
+
+    crystal_version = ""
+    IO.popen(version_command, err: [:child, :out]) do |io|
+      crystal_version = io.read.strip.split("[").first
+    end
+
     command = [
-      "docker", "run", "--quiet", "--platform", "linux/amd64", "--rm",
+      "docker", "run", "--quiet", "--platform", "linux/amd64", "--rm", "-e", "NO_COLOR=1",
       "-v", "#{code_file_path}:/code.cr",
       "crystallang/crystal", "crystal", "run", "/code.cr",
     ]
@@ -22,10 +32,10 @@ def run_crystal_code(code)
     end
 
     if $?.success?
-      stdout
+      [crystal_version, stdout]
     else
       stderr = stdout
-      stderr
+      [crystal_version, stderr]
     end
   end
 end
@@ -33,6 +43,8 @@ end
 def parse_code_lucid(code)
   Dir.mktmpdir do |dir|
     `git clone https://github.com/lucid-crystal/compiler/ #{dir}/lucid`
+
+    commit_hash = `cd #{dir}/lucid && git rev-parse --short HEAD`.strip
 
     user_code_file_path = File.join(dir, "user_code.cr")
     File.write(user_code_file_path, code)
@@ -50,7 +62,7 @@ def parse_code_lucid(code)
     CRYSTAL
 
     command = [
-      "docker", "run", "--quiet", "--platform", "linux/amd64", "--rm",
+      "docker", "run", "--quiet", "--platform", "linux/amd64", "--rm", "-e", "NO_COLOR=1",
       "-v", "#{dir}:/workspace", "-w", "/workspace",
       "crystallang/crystal", "crystal", "run", "/workspace/main.cr",
     ]
@@ -61,10 +73,10 @@ def parse_code_lucid(code)
     end
 
     if $?.success?
-      stdout
+      [commit_hash, stdout]
     else
       stderr = stdout
-      stderr
+      [commit_hash, stderr]
     end
   end
 end
@@ -81,8 +93,8 @@ bot.message do |event|
     if match = /```(?:cr|crystal)?\n([\s\S]*?)```/.match(code_block)
       code = match[1]
       begin
-        output = run_crystal_code(code)
-        event.respond "```\n#{output}\n```"
+        version, output = run_crystal_code(code)
+        event.respond "#{version}\n```\n#{output}\n```"
       rescue => e
         event.respond "Error: #{e.message}"
       end
@@ -96,8 +108,8 @@ bot.message do |event|
     if match = /```(?:cr|crystal)?\n([\s\S]*?)```/.match(code_block)
       code = match[1]
       begin
-        output = parse_code_lucid(code)
-        event.respond "```cr\n#{output}\n```"
+        hash, output = parse_code_lucid(code)
+        event.respond "commit: #{hash}\n```cr\n#{output}\n```"
       rescue => e
         event.respond "Error: #{e.message}"
       end
