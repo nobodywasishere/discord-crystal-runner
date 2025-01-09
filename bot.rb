@@ -101,15 +101,15 @@ def parse_code_tree_sitter(code)
       CMD ["bash"]
     DOCKERFILE
 
-    `cd #{dir} && docker buildx build --load -t treesitter .`
+    `cd #{dir} && docker buildx build --output=type=docker -t treesitter .`
 
     user_code_file_path = File.join(dir, "user_code.cr")
     File.write(user_code_file_path, code)
 
     command = [
       "docker", "run", "--quiet", "--platform", "linux/amd64", "--rm", "-e", "NO_COLOR=1",
-      "-v", "#{dir}:/workspace", "-v", "#{TREE_SITTER_DIR}/workspace/tree-sitter-crystal", "-w", "/workspace",
-      "treesitter", "tree-sitter", "parse", "/workspace/user_code.cr",
+      "-v", "#{dir}:/workspace", "-v", "#{TREE_SITTER_DIR}:/workspace/tree-sitter-crystal", "-w", "/workspace",
+      "treesitter", "bash", "-c", "cd tree-sitter-crystal && tree-sitter parse ../user_code.cr",
     ]
 
     stdout, stderr = "", ""
