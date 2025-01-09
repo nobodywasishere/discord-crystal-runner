@@ -106,8 +106,15 @@ def parse_code_tree_sitter(code)
       stdout = io.read
     end
 
+    warning = <<-WARNING
+    Warning: You have not configured any parser directories!
+    Please run `tree-sitter init-config` and edit the resulting
+    configuration file to indicate where we should look for
+    language grammars.
+    WARNING
+
     if $?.success?
-      [commit_hash, stdout]
+      [commit_hash, stdout.gsub(warning, "")]
     else
       stderr = stdout
       [commit_hash, stderr]
