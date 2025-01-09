@@ -81,6 +81,46 @@ def parse_code_lucid(code)
   end
 end
 
+def parse_code_tree_sitter(code)
+  Dir.mktmpdir do |dir|
+    `git clone https://github.com/crystal-lang-tools/tree-sitter-crystal/ #{dir}/tree-sitter-crystal`
+
+    commit_hash = `cd #{dir}/tree-sitter-crystal && git rev-parse --short HEAD`.strip
+
+    # Create Dockerfile in the temp directory
+    File.write("#{dir}/Dockerfile", <<~DOCKERFILE)
+      FROM --platform=linux/amd64 debian:bullseye-slim
+      RUN apt-get update && apt-get install -y git gcc g++ cmake make nodejs npm && rm -rf /var/lib/apt/lists/*
+      RUN npm install -g tree-sitter-cli
+      WORKDIR /workspace
+      CMD ["bash"]
+    DOCKERFILE
+
+    `cd #{dir} && docker build -t treesitter .`
+
+    user_code_file_path = File.join(dir, "tree-sitter-crystal", "user_code.cr")
+    File.write(user_code_file_path, code)
+
+    command = [
+      "docker", "run", "--quiet", "--platform", "linux/amd64", "--rm", "-e", "NO_COLOR=1",
+      "-v", "#{dir}:/workspace", "-w", "/workspace",
+      "treesitter", "tree-sitter", "parse", "/workspace/tree-sitter-crystal/user_code.cr",
+    ]
+
+    stdout, stderr = "", ""
+    IO.popen(command, err: [:child, :out]) do |io|
+      stdout = io.read
+    end
+
+    if $?.success?
+      [commit_hash, stdout]
+    else
+      stderr = stdout
+      [commit_hash, stderr]
+    end
+  end
+end
+
 bot = Discordrb::Bot.new token: DISCORD_BOT_TOKEN, intents: [:server_messages, :direct_messages, 1 << 15]
 
 bot.message do |event|
@@ -103,6 +143,21 @@ bot.message do |event|
     end
   elsif event.message.content.start_with?("!parse")
     code_block = event.message.content.sub("!parse", "").strip
+    puts "Parsing code: \n  #{code_block.gsub("\n", "\n  ")}"
+
+    if match = /```(?:cr|crystal)?\n([\s\S]*?)```/.match(code_block)
+      code = match[1]
+      begin
+        hash, output = parse_code_lucid(code)
+        event.respond "commit: #{hash}\n```cr\n#{output}\n```"
+      rescue => e
+        event.respond "Error: #{e.message}"
+      end
+    else
+      event.respond "Please provide a valid Crystal code block."
+    end
+  elsif event.message.content.starts_with?("!ts")
+    code_block = event.message.content.sub("!ts", "").strip
     puts "Parsing code: \n  #{code_block.gsub("\n", "\n  ")}"
 
     if match = /```(?:cr|crystal)?\n([\s\S]*?)```/.match(code_block)
