@@ -156,7 +156,7 @@ bot.message do |event|
     else
       event.respond "Please provide a valid Crystal code block."
     end
-  elsif event.message.content.starts_with?("!ts")
+  elsif event.message.content.start_with?("!ts")
     code_block = event.message.content.sub("!ts", "").strip
     puts "Parsing code: \n  #{code_block.gsub("\n", "\n  ")}"
 
