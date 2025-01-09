@@ -92,6 +92,8 @@ def parse_code_tree_sitter(code)
 
     commit_hash = `cd #{TREE_SITTER_DIR} && git rev-parse --short HEAD`.strip
 
+    `docker build -t treesitter .`
+
     user_code_file_path = File.join(dir, "user_code.cr")
     File.write(user_code_file_path, code)
 
