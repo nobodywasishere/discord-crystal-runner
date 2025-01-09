@@ -92,17 +92,6 @@ def parse_code_tree_sitter(code)
 
     commit_hash = `cd #{TREE_SITTER_DIR} && git rev-parse --short HEAD`.strip
 
-    # Create Dockerfile in the temp directory
-    File.write("#{dir}/Dockerfile", <<~DOCKERFILE)
-      FROM --platform=linux/amd64 debian:bullseye-slim
-      RUN apt-get update && apt-get install -y git gcc g++ cmake make nodejs npm && rm -rf /var/lib/apt/lists/*
-      RUN npm install -g tree-sitter-cli
-      WORKDIR /workspace
-      CMD ["bash"]
-    DOCKERFILE
-
-    `cd #{dir} && docker buildx build --output=type=docker -t treesitter .`
-
     user_code_file_path = File.join(dir, "user_code.cr")
     File.write(user_code_file_path, code)
 
