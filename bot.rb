@@ -163,7 +163,7 @@ bot.message do |event|
     if match = /```(?:cr|crystal)?\n([\s\S]*?)```/.match(code_block)
       code = match[1]
       begin
-        hash, output = parse_code_lucid(code)
+        hash, output = parse_code_tree_sitter(code)
         event.respond "commit: #{hash}\n```cr\n#{output}\n```"
       rescue => e
         event.respond "Error: #{e.message}"
