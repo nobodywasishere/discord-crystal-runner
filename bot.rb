@@ -4,6 +4,7 @@ require "discordrb"
 require "tmpdir"
 
 DISCORD_BOT_TOKEN = ENV["BOT_TOKEN"]
+TREE_SITTER_DIR = "#{__DIR__}/tree-sitter-crystal"
 
 def run_crystal_code(code)
   Dir.mktmpdir do |dir|
@@ -83,9 +84,13 @@ end
 
 def parse_code_tree_sitter(code)
   Dir.mktmpdir do |dir|
-    `git clone https://github.com/crystal-lang-tools/tree-sitter-crystal/ #{dir}/tree-sitter-crystal`
+    if File.exists?(TREE_SITTER_DIR)
+      `cd #{TREE_SITTER_DIR} && git fetch && git pull --force`
+    else
+      `git clone https://github.com/crystal-lang-tools/tree-sitter-crystal/ #{TREE_SITTER_DIR}`
+    end
 
-    commit_hash = `cd #{dir}/tree-sitter-crystal && git rev-parse --short HEAD`.strip
+    commit_hash = `cd #{TREE_SITTER_DIR} && git rev-parse --short HEAD`.strip
 
     # Create Dockerfile in the temp directory
     File.write("#{dir}/Dockerfile", <<~DOCKERFILE)
@@ -96,15 +101,15 @@ def parse_code_tree_sitter(code)
       CMD ["bash"]
     DOCKERFILE
 
-    `cd #{dir} && docker build -t treesitter .`
+    `cd #{dir} && docker buildx build --load -t treesitter .`
 
-    user_code_file_path = File.join(dir, "tree-sitter-crystal", "user_code.cr")
+    user_code_file_path = File.join(dir, "user_code.cr")
     File.write(user_code_file_path, code)
 
     command = [
       "docker", "run", "--quiet", "--platform", "linux/amd64", "--rm", "-e", "NO_COLOR=1",
-      "-v", "#{dir}:/workspace", "-w", "/workspace",
-      "treesitter", "tree-sitter", "parse", "/workspace/tree-sitter-crystal/user_code.cr",
+      "-v", "#{dir}:/workspace", "-v", "#{TREE_SITTER_DIR}/workspace/tree-sitter-crystal", "-w", "/workspace",
+      "treesitter", "tree-sitter", "parse", "/workspace/user_code.cr",
     ]
 
     stdout, stderr = "", ""
