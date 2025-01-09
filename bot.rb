@@ -84,7 +84,7 @@ end
 
 def parse_code_tree_sitter(code)
   Dir.mktmpdir do |dir|
-    if File.exists?(TREE_SITTER_DIR)
+    if File.exist?(TREE_SITTER_DIR)
       `cd #{TREE_SITTER_DIR} && git fetch && git pull --force`
     else
       `git clone https://github.com/crystal-lang-tools/tree-sitter-crystal/ #{TREE_SITTER_DIR}`
