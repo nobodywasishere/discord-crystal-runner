@@ -4,7 +4,7 @@ require "discordrb"
 require "tmpdir"
 
 DISCORD_BOT_TOKEN = ENV["BOT_TOKEN"]
-TREE_SITTER_DIR = "#{__DIR__}/tree-sitter-crystal"
+TREE_SITTER_DIR = "#{__dir__}/tree-sitter-crystal"
 
 def run_crystal_code(code)
   Dir.mktmpdir do |dir|
