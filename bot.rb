@@ -160,7 +160,7 @@ bot.message do |event|
       code = match[1]
       begin
         hash, output = parse_code_tree_sitter(code)
-        event.respond "commit: #{hash}\n```cr\n#{output}\n```"
+        event.respond "commit: [#{hash}](https://github.com/crystal-lang-tools/tree-sitter-crystal/commit/#{hash})\n```lisp\n#{output}\n```"
       rescue => e
         event.respond "Error: #{e.message}"
       end
