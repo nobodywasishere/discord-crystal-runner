@@ -57,9 +57,7 @@ def parse_code_lucid(code)
       code = File.read("./user_code.cr")
 
       tokens = Lucid::Compiler::Lexer.run code
-      Lucid::Compiler::Parser.parse(tokens).each do |node|
-        pp node
-      end
+      pp Lucid::Compiler::Parser.parse(tokens)
     CRYSTAL
 
     command = [
